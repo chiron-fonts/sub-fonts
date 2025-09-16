@@ -1,0 +1,107 @@
+name: Build and Release Fonts
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        type: choice
+        description: Profile
+        options:
+          - hei
+          - sung
+      version:
+        description: 'Version number'
+        required: true
+        default: '25.090'
+
+jobs:
+  build_fonts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare capitalized profile name
+        id: profile_case
+        uses: ASzc/change-string-case-action@v6
+        with:
+          string: ${{ github.event.inputs.profile }}
+      - name: Display inputs
+        env:
+          PROFILE: ${{ github.event.inputs.profile }} (${{ steps.profile_case.outputs.capitalized }})
+          VERSION: ${{ github.event.inputs.version }}
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          echo "Profile: $PROFILE" 
+          echo "Version: $VERSION"
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # Print all installed packages for debugging
+          pip list
+      - name: Checkout Chiron Hei HK
+        uses: actions/checkout@v3
+        with:
+          repository: chiron-fonts/chiron-hei-hk
+          sparse-checkout: |
+            VAR_TTF/ChironHeiHKVF.ttf
+          sparse-checkout-cone-mode: false
+          path: chiron-hei-hk-repo
+      - name: Checkout Chiron Sung HK
+        uses: actions/checkout@v3
+        with:
+          repository: chiron-fonts/chiron-sung-hk
+          sparse-checkout: |
+            VAR_TTF/ChironSungHKVF.ttf
+          sparse-checkout-cone-mode: false
+          path: chiron-sung-hk-repo
+      - name: Download Inter Variable Font
+        run: |
+          wget https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip
+          unzip Inter-4.1.zip -d inter-font
+      - name: Prepare fonts directory
+        run: |
+          mkdir build
+          mkdir fonts
+          cp chiron-hei-hk-repo/VAR_TTF/ChironHeiHKVF.ttf fonts/
+          cp chiron-sung-hk-repo/VAR_TTF/ChironSungHKVF.ttf fonts/
+          cp inter-font/InterVariable.ttf fonts/
+      - name: Build fonts
+        env:
+          PROFILE: ${{ github.event.inputs.profile }}
+          VERSION: ${{ github.event.inputs.version }}
+          WORKSPACE: ${{ github.workspace }}
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          python build.py ${PROFILE} ${VERSION} -f ${WORKSPACE}/fonts -o ${WORKSPACE}/build
+      - name: Zip built fonts
+        run: |
+          cd build
+          zip -r Sub${{ github.event.inputs.profile }}_v${{ github.event.inputs.version }}_all.zip *.ttf
+          cd ..
+      - name: Zip individual .ttf files
+        run: |
+          cd build
+          for file in *.ttf; do
+              zip "${file%.ttf}.zip" "$file"
+          done
+          cd ..
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: v${{ github.event.inputs.version }}-${{ github.event.inputs.profile }}
+          name: Sub${{ steps.profile_case.outputs.capitalized }} v${{ github.event.inputs.version }}
+          body: "Automated release for version ${{ github.event.inputs.version }} of ${{ github.event.inputs.profile }}."
+          artifacts: build/*.zip
+          draft: false
+          prerelease: false
+          removeArtifacts: true
+          replacesArtifacts: true
+
+#      - run: |
+#          echo "Profile: ${{ github.event.inputs.profile }}"
+#          echo "Version: ${{ github.event.inputs.version }}"
