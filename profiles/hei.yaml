@@ -17,4 +17,4 @@ profiles:
       expand_widths: [ 0.08, 0.12 ]
       latin_replace_punc: [ 1, 2 ]
       apply_ss: { '1': 15, '2': 16 }
-      new_line_gap: 80
+      new_line_gap: 60
