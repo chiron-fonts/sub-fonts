@@ -87,22 +87,18 @@ def set_line_gap(font, new_line_gap: int):
 
 
 def remove_font_tables(font):
-    # Remove STAT table if exists
-    if 'STAT' in font:
-        print("Removing STAT table...")
-        del font['STAT']
-
     # Remove cv** tables if exist
     cv_tables = [tag for tag in font.keys() if tag.startswith('cv')]
     for tag in cv_tables:
         print(f"Removing {tag} table...")
         del font[tag]
 
-    # Remove GSUB table if exists
-    if 'GSUB' in font:
-        print("Removing GSUB table...")
-        del font['GSUB']
-
+    # Remove other unneeded tables
+    tables_to_remove = ['STAT', 'GSUB', 'vmtx', 'vhea']
+    for table in tables_to_remove:
+        if table in font:
+            print(f"Removing {table} table...")
+            del font[table]
 
 def build_font(config: FontBuildConfig):
     static_font = TTFont(config.input_path)
